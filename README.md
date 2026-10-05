@@ -12,7 +12,7 @@ velora-full/
 │   │   ├── middleware/  # auth + admin role
 │   │   ├── routes/      # auth, products, categories, dashboard
 │   │   └── index.js
-│   ├── uploads/         # product images
+│   ├── (images via Cloudinary)
 │   ├── .env.example
 │   └── package.json
 ├── frontend/
@@ -74,7 +74,7 @@ npm run dev
 
 Frontend runs at **http://localhost:5173**
 
-Vite proxies `/api` and `/uploads` to the backend.
+Vite proxies `/api` to the backend.
 
 ## Environment Variables (Backend)
 
@@ -85,6 +85,9 @@ Vite proxies `/api` and `/uploads` to the backend.
 | JWT_SECRET     | Secret for signing JWTs              |
 | JWT_EXPIRES_IN | e.g. 7d                              |
 | FRONTEND_URL   | CORS origin (http://localhost:5173)  |
+| CLOUDINARY_CLOUD_NAME | Cloudinary cloud name            |
+| CLOUDINARY_API_KEY    | Cloudinary API key               |
+| CLOUDINARY_API_SECRET | Cloudinary API secret            |
 | NODE_ENV       | development / production             |
 
 ## Features
@@ -117,7 +120,7 @@ Vite proxies `/api` and `/uploads` to the backend.
 
 ## Notes
 
-- Image uploads are stored in `backend/uploads` and served at `/uploads/...`
+- Product image file uploads go to Cloudinary; `image_url` stores the secure CDN URL. Image URL field still works without Cloudinary.
 - All dynamic data comes from Neon — no mock data.
 - Frontend never receives secrets.
 - For production: set strong JWT_SECRET, use HTTPS, configure Neon connection pooling.

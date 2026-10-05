@@ -34,8 +34,8 @@ export default function AdminAddCategory() {
         <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         <label>Slug (optional)</label>
         <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto-generated if empty" />
-        {/* <label>Image URL</label>
-        <input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /> */}
+        <label>Image URL</label>
+        <input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
         <label>Status</label>
         <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
           <option value="active">Active</option>

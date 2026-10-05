@@ -1,30 +1,24 @@
 const express = require('express');
-const { body, validationResult, query } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const pool = require('../db/pool');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
+const { v2: cloudinary } = require('cloudinary');
+const streamifier = require('streamifier');
 
 const router = express.Router();
 
-// Ensure uploads dir
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  },
+// Cloudinary config (works on local + Vercel)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Memory storage — no disk writes (Vercel-safe)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|webp|gif/;
@@ -34,6 +28,23 @@ const upload = multer({
     cb(new Error('Only image files are allowed'));
   },
 });
+
+/** Upload buffer to Cloudinary; returns secure_url */
+function uploadToCloudinary(buffer, folder = 'velora/products') {
+  return new Promise((resolve, reject) => {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return reject(new Error('Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.'));
+    }
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (err, result) => {
+        if (err) return reject(err);
+        resolve(result.secure_url);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+}
 
 // Public: list products
 router.get('/', async (req, res) => {
@@ -54,7 +65,7 @@ router.get('/', async (req, res) => {
     const offset = (Math.max(1, parseInt(page)) - 1) * Math.min(50, parseInt(limit) || 12);
     const lim = Math.min(50, parseInt(limit) || 12);
 
-    let where = ["p.status = $1"];
+    let where = ['p.status = $1'];
     const params = [status];
     let idx = 2;
 
@@ -69,7 +80,7 @@ router.get('/', async (req, res) => {
       idx++;
     }
     if (featured === 'true') {
-      where.push(`p.featured = true`);
+      where.push('p.featured = true');
     }
     if (minPrice) {
       where.push(`p.price >= $${idx}`);
@@ -82,11 +93,11 @@ router.get('/', async (req, res) => {
       idx++;
     }
     if (stock === 'low') {
-      where.push(`p.stock > 0 AND p.stock <= 10`);
+      where.push('p.stock > 0 AND p.stock <= 10');
     } else if (stock === 'out') {
-      where.push(`p.stock = 0`);
+      where.push('p.stock = 0');
     } else if (stock === 'in') {
-      where.push(`p.stock > 0`);
+      where.push('p.stock > 0');
     }
 
     let orderBy = 'p.created_at DESC';
@@ -219,10 +230,9 @@ router.post(
 
       let finalImage = imageUrl || null;
       if (req.file) {
-        finalImage = `/uploads/${req.file.filename}`;
+        finalImage = await uploadToCloudinary(req.file.buffer);
       }
 
-      // Additional images from body (comma or array)
       let images = [];
       if (req.body.images) {
         try {
@@ -275,6 +285,9 @@ router.post(
       if (err.code === '23505') {
         return res.status(409).json({ success: false, message: 'SKU already exists' });
       }
+      if (err.message && err.message.includes('Cloudinary')) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
       res.status(500).json({ success: false, message: 'Something went wrong.' });
     }
   }
@@ -309,7 +322,7 @@ router.put(
 
       let finalImage = imageUrl !== undefined ? imageUrl : existing.rows[0].image_url;
       if (req.file) {
-        finalImage = `/uploads/${req.file.filename}`;
+        finalImage = await uploadToCloudinary(req.file.buffer);
       }
 
       let images = existing.rows[0].images || [];
@@ -374,6 +387,9 @@ router.put(
       });
     } catch (err) {
       console.error('Update product error:', err);
+      if (err.message && err.message.includes('Cloudinary')) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
       res.status(500).json({ success: false, message: 'Something went wrong.' });
     }
   }

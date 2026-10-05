@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -25,9 +24,6 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -47,7 +43,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  if (err.name === "MulterError" || (err.message && err.message.includes("image"))) {
+  if (err.name === 'MulterError' || (err.message && err.message.includes('image'))) {
     return res.status(400).json({ success: false, message: err.message });
   }
   res.status(500).json({ success: false, message: 'Internal server error' });
