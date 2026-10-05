@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || '/api';
+const BASE = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function request(method, path, { body, token, formData, headers = {} } = {}) {
   const opts = {
@@ -18,6 +18,7 @@ async function request(method, path, { body, token, formData, headers = {} } = {
   }
 
   const res = await fetch(`${BASE}${path}`, opts);
+
   let data;
   try {
     data = await res.json();
